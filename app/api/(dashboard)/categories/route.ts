@@ -55,7 +55,6 @@ export const POST = async (request: Request) => {
     if (!userId || !Types.ObjectId.isValid(userId)) {
       return new NextResponse("Invalid or missing user ID", { status: 400 });
     }
-
     if (!title || typeof title !== "string") {
       return new NextResponse("Invalid or missing title", { status: 400 });
     }
