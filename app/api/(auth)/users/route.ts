@@ -1,24 +1,27 @@
-import  connect  from "@/lib/db";
+/** @format */
+
+import connect from "@/lib/db";
 import User from "@/lib/modals/users";
 import { NextResponse } from "next/server";
-import {Types} from "mongoose"
-import bcrypt from 'bcrypt'
+import bcrypt from "bcrypt";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const ObjectId = require("mongoose").Types.ObjectId;
- 
-export const GET  = async () =>{
- 
+const { ObjectId } = require("mongoose").Types;
+
+export const GET = async () => {
   try {
-      await connect()
-      const users = await User.find()
-      return new NextResponse(JSON.stringify(users),{ status: 201 })
-
-  } catch (error:any) {
-          return new NextResponse("Error in fetching users" + error.message , {status:500})
+    await connect();
+    const users = await User.find();
+    return new NextResponse(JSON.stringify(users), { status: 201 });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return new NextResponse("Error in fetching users: " + error.message, {
+        status: 500,
+      });
+    }
+    return new NextResponse("An unknown error occurred.", { status: 500 });
   }
-
-}
+};
 
 export const POST = async (request: Request) => {
   try {
@@ -44,77 +47,89 @@ export const POST = async (request: Request) => {
     });
 
     await user.save();
-
     return new NextResponse(JSON.stringify(user), { status: 201 });
-  } catch (error: any) {
-    return new NextResponse(`Error in adding a user: ${error.message}`, { status: 500 });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return new NextResponse("Error in adding a user: " + error.message, {
+        status: 500,
+      });
+    }
+    return new NextResponse("An unknown error occurred.", { status: 500 });
   }
 };
 
-export const PATCH = async (request : Request) => {
+export const PATCH = async (request: Request) => {
+  try {
+    const body = await request.json();
+    const { userId, newUsername } = body;
 
-    try {
-        const body = await request.json();
+    await connect();
 
-        const {userId , newUsername  } = body
+    if (!userId || !newUsername) {
+      return new NextResponse("UserId or new username not found", {
+        status: 400,
+      });
+    }
 
-        await connect();
+    if (!ObjectId.isValid(userId)) {
+      return new NextResponse("Invalid UserId", { status: 400 });
+    }
 
-        if(!userId || !newUsername) { 
-            return new NextResponse("user Id or new username not found", {status: 400})
-        }
+    const updatedUser = await User.findByIdAndUpdate(
+      new ObjectId(userId),
+      { username: newUsername },
+      { new: true }
+    );
 
-        if(!Types.ObjectId.isValid(userId)) {
-            return new NextResponse("inValid UserId", {status: 400})
-        }
+    if (!updatedUser) {
+      return new NextResponse(
+        JSON.stringify({ message: "User not found in db" }),
+        { status: 400 }
+      );
+    }
 
-        const updateUser = await User.findByIdAndUpdate({_id : new ObjectId(userId)} , {username : newUsername}, {new : true})
+    return new NextResponse(JSON.stringify(updatedUser), { status: 200 });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return new NextResponse("Error in updating users: " + error.message, {
+        status: 500,
+      });
+    }
+    return new NextResponse("An unknown error occurred.", { status: 500 });
+  }
+};
 
+export const DELETE = async (request: Request) => {
+  try {
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get("userId");
 
-        if(!updateUser) {
-        return new NextResponse(JSON.stringify({message:"User not found in db"}), {status:400})
-        }
+    if (!userId) {
+      return new NextResponse("UserId not found", { status: 400 });
+    }
 
-         return new NextResponse(JSON.stringify(updateUser), {status:200})
+    if (!ObjectId.isValid(userId)) {
+      return new NextResponse("Invalid UserId", { status: 400 });
+    }
 
+    await connect();
 
-    }catch (error:any) {
-          return new NextResponse("Error in adding a user" + error.message , {status:500})
-}
+    const deletedUser = await User.findByIdAndDelete(new ObjectId(userId));
 
+    if (!deletedUser) {
+      return new NextResponse(
+        JSON.stringify({ message: "User not found in db" }),
+        { status: 400 }
+      );
+    }
 
-}
-
-export const DELETE = async (request : Request) => {
-
-
-    try {
-      const { searchParams } = new URL(request.url);
-        const userId = searchParams.get('userId');
-
-        if(!userId ) { 
-            return new NextResponse("user Id or new username not found", {status: 400})
-        }
-
-        if(!Types.ObjectId.isValid(userId)) {
-            return new NextResponse("inValid UserId", {status: 400})
-        }
-
-        await connect()
-
-        const deletedUser = await User.findByIdAndDelete(
-            new Types.ObjectId(userId))
-
-        if(!deletedUser) {
-        return new NextResponse(JSON.stringify({message:"User not found in db"}), {status:400})
-        }
-
-         return new NextResponse(JSON.stringify(deletedUser), {status:200})
-
-    } catch (error:any) {
-          return new NextResponse("Error in deleting  a user" + error.message , {status:500})
-}
-
-
-
-}
+    return new NextResponse(JSON.stringify(deletedUser), { status: 200 });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return new NextResponse("Error in deleting users: " + error.message, {
+        status: 500,
+      });
+    }
+    return new NextResponse("An unknown error occurred.", { status: 500 });
+  }
+};
